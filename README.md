@@ -3,5 +3,4 @@
 Run this command in terminal
 ```
 yarn dev
-
 ```
