@@ -53,6 +53,33 @@ app.get("/register", async (req, res) => {
     }
 });
 
+// reset password
+app.post("/reset", async (req, res) => {
+    const { oldPassword, newPassword, email } = req.body;
+    // validating current user with old password
+    const user = await User.findOne({
+        email: email
+    });
+    if (!user) {
+        return { status: 'error', error: 'Invalid old password' }
+    };
+    const isPasswordValid = await bcrypt.compare(oldPassword, user.password);
+    // changing the password if old password is true
+    if (isPasswordValid) {
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
+        user.password = hashedPassword;
+        // console.log(hashedPassword);
+
+        user.save().then(savedDoc => {
+            console.log('password changed');
+        })
+        return res.json({ status: 'ok', message: 'password changed' });
+    } else {
+        return res.json({ status: 'error', user: false })
+    }
+    res.json({ status: 'ok' })
+})
+
 app.listen(port, () => {
     console.log(`Running server on http://localhost:${port}`);
 });
