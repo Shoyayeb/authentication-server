@@ -14,7 +14,7 @@ const port = process.env.PORT || 5000;
 mongoose.connect('mongodb://localhost:27017/authentication-server');
 
 // login
-app.get("/login", async (req, res) => {
+app.post("/login", async (req, res) => {
     // console.log(req.body);
     const user = await User.findOne({
         email: req.body.email
@@ -39,17 +39,23 @@ app.get("/login", async (req, res) => {
 // register
 app.post("/register", async (req, res) => {
     // console.log(req.body);
+    // first name, last name, email, package plan, phone, photoURL
+    const { password, firstName, lastName, email, packagePlan, phone, photoURL } = req.body;
     try {
-        const newPassword = await bcrypt.hash(req.body.password, 10)
+        const hashedPassword = await bcrypt.hash(password, 10);
         const user = await User.create({
-            name: req.body.name,
-            email: req.body.email,
-            password: newPassword,
+            firstName,
+            lastName,
+            email,
+            packagePlan,
+            phone,
+            photoURL,
+            password: hashedPassword
         })
         res.json({ status: 'ok' })
     } catch (err) {
         // console.log(err);
-        res.json({ status: 'error', error: 'Duplicate email' })
+        res.json({ status: 'error', error: 'Duplicate email' });
     }
 });
 
@@ -104,7 +110,41 @@ app.post("/change_name", async (req, res) => {
     };
 
     res.json({ status: 'ok' })
-})
+});
+
+
+// dynamic route for changing detail
+app.post("/change_details", async (req, res) => {
+    const { password, newUserDetails, email } = req.body;
+    // validating current user with old password
+    const user = await User.findOne({
+        email: email
+    });
+    if (!user) {
+        return { status: 'error', error: 'Invalid email' }
+    };
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+
+    // changing details
+    const { firstName, lastName, packagePlan, phone, photoURL } = newUserDetails;
+    if (isPasswordValid) {
+        user.firstName = firstName;
+        user.lastName = lastName;
+        user.email = email;
+        user.packagePlan = packagePlan;
+        user.phone = phone;
+        user.photoURL = photoURL;
+
+        user.save().then(savedDoc => {
+            console.log('name changed', savedDoc);
+        });
+        return res.json({ status: 'ok', message: 'name changed' });
+    } else {
+        return res.json({ status: 'error', message: 'wrong password' })
+    };
+
+    res.json({ status: 'ok' })
+});
 
 app.listen(port, () => {
     console.log(`Running server on http://localhost:${port}`);
