@@ -37,7 +37,7 @@ app.get("/login", async (req, res) => {
 });
 
 // register
-app.get("/register", async (req, res) => {
+app.post("/register", async (req, res) => {
     // console.log(req.body);
     try {
         const newPassword = await bcrypt.hash(req.body.password, 10)
@@ -56,27 +56,53 @@ app.get("/register", async (req, res) => {
 // reset password
 app.post("/reset", async (req, res) => {
     const { oldPassword, newPassword, email } = req.body;
+
     // validating current user with old password
     const user = await User.findOne({
         email: email
     });
     if (!user) {
-        return { status: 'error', error: 'Invalid old password' }
+        return { status: 'error', error: 'Invalid email' }
     };
     const isPasswordValid = await bcrypt.compare(oldPassword, user.password);
+
     // changing the password if old password is true
     if (isPasswordValid) {
         const hashedPassword = await bcrypt.hash(newPassword, 10);
         user.password = hashedPassword;
-        // console.log(hashedPassword);
-
         user.save().then(savedDoc => {
             console.log('password changed');
         })
         return res.json({ status: 'ok', message: 'password changed' });
     } else {
-        return res.json({ status: 'error', user: false })
-    }
+        return res.json({ status: 'error', message: 'wrong password' })
+    };
+
+    res.json({ status: 'ok' })
+});
+
+app.post("/change_name", async (req, res) => {
+    const { email, password, newName } = req.body;
+    // validating current user with old password
+    const user = await User.findOne({
+        email: email
+    });
+    if (!user) {
+        return { status: 'error', error: 'Invalid email' }
+    };
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+
+    // changing details
+    if (isPasswordValid) {
+        user.name = newName;
+        user.save().then(savedDoc => {
+            console.log('name changed');
+        });
+        return res.json({ status: 'ok', message: 'name changed' });
+    } else {
+        return res.json({ status: 'error', message: 'wrong password' })
+    };
+
     res.json({ status: 'ok' })
 })
 
