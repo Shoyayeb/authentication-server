@@ -5,6 +5,7 @@ const mongoose = require('mongoose');
 const User = require("./models/user.model");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
+const crypto = require("crypto");
 
 const app = express();
 app.use(cors());
@@ -19,17 +20,20 @@ app.post("/login", async (req, res) => {
     const user = await User.findOne({
         email: req.body.email
     });
-
     if (!user) {
         return { status: 'error', error: 'Invalid login' }
     }
     const isPasswordValid = await bcrypt.compare(req.body.password, user.password);
     if (isPasswordValid) {
         const token = jwt.sign({
-            name: user.name,
-            email: user.email
+            // firstName: user.firstName,
+            // lastName: user.lastName,
+            email: user.email,
+            uuid: user.uuid
+            // packagePlan: user.packagePlan,
+            // phone: user.phone,
+            // photoURL: user.photoURL
         }, process.env.JWTSECRET);
-
         return res.json({ status: 'ok', user: token });
     } else {
         return res.json({ status: 'error', user: false })
@@ -43,6 +47,7 @@ app.post("/register", async (req, res) => {
     const { password, firstName, lastName, email, packagePlan, phone, photoURL } = req.body;
     try {
         const hashedPassword = await bcrypt.hash(password, 10);
+        const uuid = crypto.randomUUID();
         const user = await User.create({
             firstName,
             lastName,
@@ -50,8 +55,9 @@ app.post("/register", async (req, res) => {
             packagePlan,
             phone,
             photoURL,
+            uuid,
             password: hashedPassword
-        })
+        });
         res.json({ status: 'ok' })
     } catch (err) {
         // console.log(err);
@@ -87,6 +93,7 @@ app.post("/reset", async (req, res) => {
     res.json({ status: 'ok' })
 });
 
+// Changing user name
 app.post("/change_name", async (req, res) => {
     const { email, password, newName } = req.body;
     // validating current user with old password
@@ -113,7 +120,7 @@ app.post("/change_name", async (req, res) => {
 });
 
 
-// dynamic route for changing detail
+// route for changing all detail
 app.post("/change_details", async (req, res) => {
     const { password, newUserDetails, email } = req.body;
     // validating current user with old password
@@ -144,6 +151,34 @@ app.post("/change_details", async (req, res) => {
     };
 
     res.json({ status: 'ok' })
+});
+
+app.get("/me", async (req, res) => {
+    if (req.body.token) {
+        const verifiedToken = jwt.verify(req.body.token, process.env.JWTSECRET);
+        const user = await User.findOne({
+            email: verifiedToken.email
+        });
+
+        if (!user) {
+            return { status: 'error', error: 'Invalid email' }
+        } else if (user) {
+            const userDetails = jwt.sign({
+                firstName: user.firstName,
+                lastName: user.lastName,
+                email: user.email,
+                uuid: user.uuid,
+                packagePlan: user.packagePlan,
+                phone: user.phone,
+                photoURL: user.photoURL
+            }, process.env.JWTSECRET);
+
+            return res.json({ status: 'ok', userDetails });
+        } else {
+            return res.json({ status: 'error', message: 'wrong password' })
+        };
+    }
+    res.json({ status: 'ok' });
 });
 
 app.listen(port, () => {
