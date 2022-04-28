@@ -12,7 +12,11 @@ app.use(cors());
 app.use(express.json());
 
 const port = process.env.PORT || 5000;
-mongoose.connect('mongodb://localhost:27017/authentication-server');
+mongoose.connect('mongodb://localhost:27017/authentication-server').then(result => {
+    console.log('DB connected');
+}).catch(err => {
+    console.log(err);
+});
 
 // login
 app.post("/login", async (req, res) => {
@@ -153,6 +157,7 @@ app.post("/change_details", async (req, res) => {
     res.json({ status: 'ok' })
 });
 
+// route for getting all userDetails
 app.get("/me", async (req, res) => {
     if (req.body.token) {
         const verifiedToken = jwt.verify(req.body.token, process.env.JWTSECRET);
