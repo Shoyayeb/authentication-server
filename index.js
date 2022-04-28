@@ -6,12 +6,33 @@ const User = require("./models/user.model");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
 const crypto = require("crypto");
+const nodemailer = require("nodemailer");
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
 const port = process.env.PORT || 5000;
+
+const sendMail = async (toEmail) => {
+    let transporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: {
+            user: process.env.NODEMAILER_EMAIL,
+            pass: process.env.NODEMAILER_PASS
+        }
+    });
+    let info = await transporter.sendMail({
+        from: `"${process.env.NODEMAILER_NAME}" <${process.env.NODEMAILER_EMAIL}>`, // sender address
+        to: toEmail, // list of receivers
+        subject: "Message from nodeJS App", // Subject line
+        text: "Hello world?", // plain text body
+        html: "<b>Hello world?</b>", // html body
+    });
+    console.log("Message sent: %s", info.messageId);
+    console.log("Preview URL: %s", nodemailer.getTestMessageUrl(info));
+}
+
 mongoose.connect('mongodb://localhost:27017/authentication-server').then(result => {
     console.log('DB connected');
 }).catch(err => {
@@ -185,6 +206,27 @@ app.get("/me", async (req, res) => {
     }
     res.json({ status: 'ok' });
 });
+
+// send email
+app.post("/email_user", async (req, res) => {
+    if (req.body.token) {
+        const verifiedToken = jwt.verify(req.body.token, process.env.JWTSECRET);
+        const user = await User.findOne({
+            email: verifiedToken.email
+        });
+
+        if (!user) {
+            return { status: 'error', error: 'Invalid email' }
+        } else if (user) {
+            sendMail(req.body.toEmail).catch(console.error);
+            return res.json({ status: 'ok', message: 'mail sent' });
+        } else {
+            return res.json({ status: 'error', message: 'wrong password' });
+        };
+    }
+    res.json({ status: 'ok' });
+});
+
 
 app.listen(port, () => {
     console.log(`Running server on http://localhost:${port}`);
