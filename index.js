@@ -7,6 +7,7 @@ const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
 const crypto = require("crypto");
 const nodemailer = require("nodemailer");
+const passwordGenerator = require('secure-random-password');
 
 const app = express();
 app.use(cors());
@@ -14,7 +15,7 @@ app.use(express.json());
 
 const port = process.env.PORT || 5000;
 
-const sendMail = async (toEmail) => {
+const sendMail = async (toEmail, message) => {
     let transporter = nodemailer.createTransport({
         service: 'gmail',
         auth: {
@@ -23,11 +24,11 @@ const sendMail = async (toEmail) => {
         }
     });
     let info = await transporter.sendMail({
-        from: `"${process.env.NODEMAILER_NAME}" <${process.env.NODEMAILER_EMAIL}>`, // sender address
+        from: `"NodeJS authenticator application" <${process.env.NODEMAILER_EMAIL}>`, // sender address
         to: toEmail, // list of receivers
         subject: "Message from nodeJS App", // Subject line
-        text: "Hello world?", // plain text body
-        html: "<b>Hello world?</b>", // html body
+        text: `${message}`, // plain text body
+        html: `${message}`, // html body
     });
     console.log("Message sent: %s", info.messageId);
     console.log("Preview URL: %s", nodemailer.getTestMessageUrl(info));
@@ -35,6 +36,7 @@ const sendMail = async (toEmail) => {
 
 mongoose.connect('mongodb://localhost:27017/authentication-server').then(result => {
     console.log('DB connected');
+
 }).catch(err => {
     console.log(err);
 });
@@ -218,7 +220,7 @@ app.post("/email_user", async (req, res) => {
         if (!user) {
             return { status: 'error', error: 'Invalid email' }
         } else if (user) {
-            sendMail(req.body.toEmail).catch(console.error);
+            sendMail(req.body.toEmail, req.body.message).catch(console.error);
             return res.json({ status: 'ok', message: 'mail sent' });
         } else {
             return res.json({ status: 'error', message: 'wrong password' });
@@ -226,6 +228,45 @@ app.post("/email_user", async (req, res) => {
     }
     res.json({ status: 'ok' });
 });
+
+app.post("/new_user", async (req, res) => {
+    if (req.body.token) {
+        const verifiedToken = jwt.verify(req.body.token, process.env.JWTSECRET);
+        const user = await User.findOne({
+            email: verifiedToken.email
+        });
+
+        if (!user) {
+            return { status: 'error', error: 'Invalid email' }
+        } else if (user) {
+            const { firstName, lastName, newUserEmail, phone, photoURL } = req.body;
+            const randomPassword = passwordGenerator.randomPassword({ length: 6, characters: passwordGenerator.digits });
+            const hashedPassword = await bcrypt.hash(randomPassword, 10);
+            const uuid = crypto.randomUUID();
+            const user = await User.create({
+                firstName,
+                lastName,
+                email: newUserEmail,
+                packagePlan: "basic",
+                phone,
+                photoURL,
+                uuid,
+                password: hashedPassword
+            }).then(result => {
+                sendMail(newUserEmail, `
+                New User Created.
+                Here is the credetials for the new user
+                Email: ${newUserEmail}
+                Password: ${randomPassword}
+                `)
+            })
+            return res.json({ status: 'ok', message: 'user created successfully' });
+        } else {
+            return res.json({ status: 'error', message: 'wrong password' });
+        };
+    }
+    res.json({ status: 'ok' });
+})
 
 
 app.listen(port, () => {
